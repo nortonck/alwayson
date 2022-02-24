@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-deploy
+  labels:
+    app: {{ .Chart.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+spec:
+  replicas: {{ .Values.replicas | default 3 }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+    spec:
+      containers:
+      - image: {{ .Values.containerimage }}
+        imagePullPolicy: {{ .Values.container.pullPolicy | default "Always" | quote }}
+        name: healthservice
+        securityContext:
+          privileged: false # Running a container as privileged gives all capabilities to the container, and it also lifts all the limitations enforced by the device cgroup controller.
+          readOnlyRootFilesystem: true # If a container does not need to write files, it should be run with a read-only filesystem.
+          allowPrivilegeEscalation: false # Controls whether a process can gain more privileges than its parent process.
+        ports:
+        - containerPort: {{ .Values.workload.port | default 8080 }}
+        livenessProbe:
+          httpGet:
+            path: /health/liveness
+            port: {{ .Values.workload.port | default 8080 }}
+          initialDelaySeconds: 5
+          periodSeconds: 30
+          timeoutSeconds: 3
+        resources:
+          limits:
+            cpu:    "300m"
+            memory: "512Mi"
+          requests:
+            cpu:    "100m"
+            memory: "250Mi"
+        env:
+            - name: "AZURE_REGION" # This value only gets calculated at application deployment time so it does not exist in Key Vault as a secret (plus, it is not secret)
+              value: {{ .Values.azure.region }}
+            - name: "ASPNETCORE_URLS" # Port used to start the ASP.NET Core application
+              value: "http://+:{{ .Values.workload.port | default 8080 }}"
+        volumeMounts:
+          - name: secrets-store-inline
+            mountPath: "/mnt/secrets-store"
+            readOnly: true
+          - name: tmp-volume
+            mountPath: "/tmp"
+          - name: var-log-volume
+            mountPath: "/var/log"
+      volumes:
+        - name: secrets-store-inline
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: azure-kv
+        - name: tmp-volume
+          emptyDir: {}
+        - name: var-log-volume
+          emptyDir: {}

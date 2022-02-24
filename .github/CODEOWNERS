@@ -1,0 +1,9 @@
+# Owners of repository
+/.github/CODEOWNERS @calcof
+/README.md @calcof
+
+# Owners of reference implementation docs
+/docs/reference-implementation/ @calcof @sebader @msimecek @heoelri @hjscherer @nielsams
+
+# Owners of reference implementation technical artefacts
+/src/ @calcof @sebader @msimecek @heoelri @hjscherer @nielsams
